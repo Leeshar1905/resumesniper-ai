@@ -1,114 +1,471 @@
-// api/tailor.js
-// Vercel Serverless Function — Node.js runtime
-//
-// Receives: POST { apiKey, bullet, jobDesc }
-// Returns:  { result: "rewritten bullet text" }
-//           or { error: "message" } with an appropriate HTTP status
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ResumeSniper AI</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap');
 
-export default async function handler(req, res) {
+    :root {
+      --bg:        #0d0b14;
+      --surface:   #16122a;
+      --card:      #1e1937;
+      --border:    #2e2750;
+      --accent:    #7c3aed;
+      --accent-hi: #a855f7;
+      --accent-glow: rgba(124, 58, 237, 0.25);
+      --text:      #e8e3f5;
+      --muted:     #8b82a9;
+      --success:   #22d3ee;
+      --error:     #f87171;
+    }
 
-  // ── 1. Only accept POST ──────────────────────────────────────────────────
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed. Use POST.' });
-  }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  // ── 2. Parse & validate the request body ────────────────────────────────
-  const { apiKey, bullet, jobDesc } = req.body ?? {};
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
 
-  if (!apiKey || typeof apiKey !== 'string' || !apiKey.startsWith('AIza')) {
-    return res.status(400).json({ error: 'A valid Google API key (starting with "AIza") is required.' });
-  }
+    /* ── Header ── */
+    header {
+      width: 100%;
+      padding: 1.25rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
 
-  if (!bullet || typeof bullet !== 'string' || bullet.trim().length === 0) {
-    return res.status(400).json({ error: 'A non-empty resume bullet is required.' });
-  }
+    header .logo-icon {
+      width: 34px; height: 34px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-hi));
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
 
-  if (!jobDesc || typeof jobDesc !== 'string' || jobDesc.trim().length === 0) {
-    return res.status(400).json({ error: 'A non-empty job description is required.' });
-  }
+    header h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.2rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: var(--text);
+    }
 
-  // ── 3. Build the Gemini prompt ───────────────────────────────────────────
-  const prompt = `
-You are an expert resume writer and career coach.
+    header h1 span { color: var(--accent-hi); }
 
-Your task: rewrite the "Original Bullet" below so it closely mirrors the language,
-keywords, and priorities found in the "Job Description". The rewritten bullet must:
-- Begin with a strong past-tense action verb
-- Include at least one quantifiable metric (invent a plausible one if none exists)
-- Incorporate 2–4 keywords or phrases that appear verbatim in the job description
-- Stay under 30 words
-- Output ONLY the single rewritten bullet — no preamble, no explanation
+    header .badge {
+      margin-left: auto;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--accent-hi);
+      background: var(--accent-glow);
+      border: 1px solid var(--accent);
+      padding: 0.25rem 0.6rem;
+      border-radius: 20px;
+    }
 
---- Original Bullet ---
-${bullet.trim()}
+    /* ── Main layout ── */
+    main {
+      width: 100%;
+      max-width: 860px;
+      padding: 2.5rem 1.5rem 4rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.75rem;
+    }
 
---- Job Description ---
-${jobDesc.trim()}
+    .hero {
+      text-align: center;
+      padding: 0.5rem 0 0.25rem;
+    }
 
-Rewritten Bullet:`.trim();
+    .hero h2 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(1.6rem, 4vw, 2.2rem);
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      line-height: 1.2;
+      margin-bottom: 0.6rem;
+    }
 
-  // ── 4. Call the Gemini API ───────────────────────────────────────────────
-  const GEMINI_URL =
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    .hero h2 em {
+      font-style: normal;
+      background: linear-gradient(90deg, var(--accent-hi), #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
 
-  let geminiRes;
-  try {
-    geminiRes = await fetch(GEMINI_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [{ text: prompt }],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 120,
-        },
-      }),
-    });
-  } catch (networkErr) {
-    console.error('[tailor] Network error reaching Gemini:', networkErr);
-    return res.status(502).json({
-      error: 'Could not reach the Gemini API. Check your network or try again.',
-    });
-  }
+    .hero p {
+      font-size: 0.95rem;
+      color: var(--muted);
+      max-width: 480px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
 
-  // ── 5. Handle Gemini error responses ────────────────────────────────────
-  if (!geminiRes.ok) {
-    let geminiError = `Gemini API returned status ${geminiRes.status}`;
-    try {
-      const errBody = await geminiRes.json();
-      geminiError = errBody?.error?.message ?? geminiError;
-    } catch { /* ignore JSON parse failures */ }
+    /* ── Cards ── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
 
-    console.error('[tailor] Gemini error:', geminiError);
+    .card-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
 
-    // Surface auth errors clearly to the client
-    const clientStatus = geminiRes.status === 400 || geminiRes.status === 401 || geminiRes.status === 403
-      ? 400
-      : 502;
+    .card-title::before {
+      content: '';
+      display: inline-block;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent-hi);
+    }
 
-    return res.status(clientStatus).json({ error: geminiError });
-  }
+    /* ── Form elements ── */
+    label {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--muted);
+      display: block;
+      margin-bottom: 0.4rem;
+    }
 
-  // ── 6. Parse the Gemini response ─────────────────────────────────────────
-  let result;
-  try {
-    const geminiData = await geminiRes.json();
-    result = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-  } catch (parseErr) {
-    console.error('[tailor] Failed to parse Gemini response:', parseErr);
-    return res.status(502).json({ error: 'Unexpected response format from Gemini.' });
-  }
+    input[type="password"],
+    textarea {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.9rem;
+      padding: 0.7rem 0.9rem;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      outline: none;
+      resize: vertical;
+    }
 
-  if (!result) {
-    return res.status(502).json({
-      error: 'Gemini returned an empty response. The content may have been filtered.',
-    });
-  }
+    input[type="password"]::placeholder,
+    textarea::placeholder { color: var(--muted); opacity: 0.6; }
 
-  // ── 7. Return the tailored bullet to the frontend ─────────────────────────
-  return res.status(200).json({ result });
-}
+    input[type="password"]:focus,
+    textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    textarea { min-height: 100px; line-height: 1.55; }
+
+    .field { display: flex; flex-direction: column; }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    @media (max-width: 600px) {
+      .two-col { grid-template-columns: 1fr; }
+    }
+
+    /* ── Button ── */
+    button#tailorBtn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+      background: linear-gradient(135deg, var(--accent), #6d28d9);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 0.85rem 2rem;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s, box-shadow 0.15s;
+      box-shadow: 0 4px 20px var(--accent-glow);
+      align-self: flex-start;
+    }
+
+    button#tailorBtn:hover:not(:disabled) {
+      opacity: 0.9;
+      box-shadow: 0 6px 28px var(--accent-glow);
+      transform: translateY(-1px);
+    }
+
+    button#tailorBtn:active:not(:disabled) { transform: translateY(0); }
+
+    button#tailorBtn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    /* ── Output ── */
+    #outputSection { display: none; }
+
+    #outputBox {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent-hi);
+      border-radius: 8px;
+      padding: 1rem 1.1rem;
+      font-size: 0.9rem;
+      line-height: 1.65;
+      white-space: pre-wrap;
+      color: var(--text);
+      min-height: 80px;
+    }
+
+    .copy-row {
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    button#copyBtn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 7px;
+      padding: 0.4rem 0.85rem;
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+    }
+
+    button#copyBtn:hover {
+      color: var(--text);
+      border-color: var(--accent);
+    }
+
+    /* ── Status / error ── */
+    #status {
+      font-size: 0.83rem;
+      border-radius: 7px;
+      padding: 0.6rem 0.9rem;
+      display: none;
+    }
+
+    #status.error {
+      display: block;
+      background: rgba(248, 113, 113, 0.1);
+      border: 1px solid rgba(248, 113, 113, 0.35);
+      color: var(--error);
+    }
+
+    #status.info {
+      display: block;
+      background: rgba(124, 58, 237, 0.12);
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+
+    /* ── Spinner ── */
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Key hint ── */
+    .key-hint {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 0.35rem;
+    }
+
+    .key-hint a { color: var(--accent-hi); text-decoration: none; }
+    .key-hint a:hover { text-decoration: underline; }
+
+    footer {
+      margin-top: auto;
+      padding: 1.5rem;
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-align: center;
+      border-top: 1px solid var(--border);
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo-icon">🎯</div>
+    <h1>Resume<span>Sniper</span> AI</h1>
+    <div class="badge">Vercel Edition</div>
+  </header>
+
+  <main>
+
+    <div class="hero">
+      <h2>Tailor every bullet.<br><em>Land every role.</em></h2>
+      <p>Paste a resume bullet and a job description. Get a rewritten bullet that mirrors the job's language — powered by Gemini.</p>
+    </div>
+
+    <!-- API Key -->
+    <div class="card">
+      <div class="card-title">API Configuration</div>
+      <div class="field">
+        <label for="apiKey">Google Gemini API Key</label>
+        <input
+          type="password"
+          id="apiKey"
+          placeholder="AIzaSy…"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <p class="key-hint">
+          Your key is sent only to your own serverless function — never stored.
+          Get one at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Google AI Studio ↗</a>
+        </p>
+      </div>
+    </div>
+
+    <!-- Inputs -->
+    <div class="card">
+      <div class="card-title">Your Content</div>
+      <div class="two-col">
+        <div class="field">
+          <label for="bullet">Original Resume Bullet</label>
+          <textarea
+            id="bullet"
+            placeholder="e.g. Led a team that improved deployment pipeline speed."
+            rows="5"
+          ></textarea>
+        </div>
+        <div class="field">
+          <label for="jobDesc">Job Description</label>
+          <textarea
+            id="jobDesc"
+            placeholder="Paste the relevant portion of the job posting here…"
+            rows="5"
+          ></textarea>
+        </div>
+      </div>
+
+      <div id="status"></div>
+
+      <button id="tailorBtn" onclick="tailorBullet()">
+        <span class="spinner" id="spinner"></span>
+        <span id="btnLabel">✦ Tailor This Bullet</span>
+      </button>
+    </div>
+
+    <!-- Output -->
+    <div class="card" id="outputSection">
+      <div class="card-title">Tailored Result</div>
+      <div id="outputBox"></div>
+      <div class="copy-row">
+        <button id="copyBtn" onclick="copyOutput()">Copy</button>
+      </div>
+    </div>
+
+  </main>
+
+  <footer>ResumeSniper AI · Runs on Vercel Serverless · Your API key never leaves your function</footer>
+
+  <script>
+    async function tailorBullet() {
+      const apiKey  = document.getElementById('apiKey').value.trim();
+      const bullet  = document.getElementById('bullet').value.trim();
+      const jobDesc = document.getElementById('jobDesc').value.trim();
+      const status  = document.getElementById('status');
+      const btn     = document.getElementById('tailorBtn');
+      const spinner = document.getElementById('spinner');
+      const label   = document.getElementById('btnLabel');
+
+      // — Validate —
+      status.className = '';
+      status.style.display = 'none';
+
+      if (!apiKey) return showStatus('error', 'Please enter your Gemini API key.');
+      if (!bullet) return showStatus('error', 'Please paste in your original resume bullet.');
+      if (!jobDesc) return showStatus('error', 'Please paste in the job description.');
+
+      // — Loading state —
+      btn.disabled    = true;
+      spinner.style.display = 'block';
+      label.textContent = 'Tailoring…';
+      showStatus('info', 'Sending to /api/tailor — this usually takes 3–6 seconds.');
+
+      try {
+        const response = await fetch('/api/tailor', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ apiKey, bullet, jobDesc }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || `Server error ${response.status}`);
+        }
+
+        // — Show result —
+        document.getElementById('outputSection').style.display = 'block';
+        document.getElementById('outputBox').textContent = data.result;
+        status.style.display = 'none';
+        document.getElementById('outputSection').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+      } catch (err) {
+        showStatus('error', `Error: ${err.message}`);
+      } finally {
+        btn.disabled = false;
+        spinner.style.display = 'none';
+        label.textContent = '✦ Tailor This Bullet';
+      }
+    }
+
+    function showStatus(type, msg) {
+      const el = document.getElementById('status');
+      el.className = type;
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+
+    async function copyOutput() {
+      const text = document.getElementById('outputBox').textContent;
+      try {
+        await navigator.clipboard.writeText(text);
+        const btn = document.getElementById('copyBtn');
+        btn.textContent = 'Copied ✓';
+        setTimeout(() => btn.textContent = 'Copy', 2000);
+      } catch {
+        alert('Copy failed — please select the text manually.');
+      }
+    }
+  </script>
+
+</body>
+</html>
