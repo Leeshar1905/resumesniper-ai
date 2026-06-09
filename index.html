@@ -410,8 +410,8 @@
       status.style.display = 'none';
 
       if (!apiKey.startsWith('AQ') && !apiKey.startsWith('AIza')) {
-    return showStatus('error', 'Please enter a valid Gemini API key starting with AQ or AIza.');
-    }
+          return showStatus('error', 'Please enter a valid Gemini API key starting with AQ or AIza.');
+        }
       if (!bullet) return showStatus('error', 'Please paste in your original resume bullet.');
       if (!jobDesc) return showStatus('error', 'Please paste in the job description.');
 
